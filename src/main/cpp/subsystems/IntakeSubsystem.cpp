@@ -43,14 +43,17 @@ void IntakeSubsystem::ConfigureMotors() {
       .ReverseSoftLimit(IntakeConstants::kDeployedAngleDeg)
       .ReverseSoftLimitEnabled(true);
 
-  deployConfig.closedLoop.SetFeedbackSensor(rev::spark::kPrimaryEncoder)
-      .Pid(IntakeConstants::kDeployP, IntakeConstants::kDeployI,
-           IntakeConstants::kDeployD)
-      .OutputRange(-0.8, 0.8, rev::spark::ClosedLoopSlot::kSlot0);
+  // Configure Slot 0
+deployConfig.closedLoop
+    .SetFeedbackSensor(rev::spark::kPrimaryEncoder)
+    .Pid(IntakeConstants::kDeployP, IntakeConstants::kDeployI,
+         IntakeConstants::kDeployD, rev::spark::ClosedLoopSlot::kSlot0) 
+    .OutputRange(-0.8, 0.8, rev::spark::ClosedLoopSlot::kSlot0);
 
-  deployConfig.closedLoop.SetFeedbackSensor(rev::spark::kPrimaryEncoder)
+  // Configure Slot 1
+  deployConfig.closedLoop
       .Pid(IntakeConstants::kDeployP, IntakeConstants::kDeployI,
-           IntakeConstants::kDeployD)
+           IntakeConstants::kDeployD, rev::spark::ClosedLoopSlot::kSlot1) 
       .OutputRange(-0.2, 0.2, rev::spark::ClosedLoopSlot::kSlot1);
 
   m_deployMotor.Configure(deployConfig, rev::ResetMode::kResetSafeParameters,
@@ -83,17 +86,20 @@ void IntakeSubsystem::SetDeployState(DeployState state) {
     case DeployState::kDeployed:
       m_deployController.SetSetpoint(
           IntakeConstants::kDeployedAngleDeg,
-          rev::spark::SparkLowLevel::ControlType::kPosition, rev::spark::ClosedLoopSlot::kSlot0);
+          rev::spark::SparkLowLevel::ControlType::kPosition, 
+          rev::spark::ClosedLoopSlot::kSlot0);
       break;
     case DeployState::kAgitating:
       m_deployController.SetSetpoint(
           IntakeConstants::kStowedAngleDeg,
-          rev::spark::SparkLowLevel::ControlType::kPosition, rev::spark::ClosedLoopSlot::kSlot1);
+          rev::spark::SparkLowLevel::ControlType::kPosition, 
+          rev::spark::ClosedLoopSlot::kSlot1); // Slot 1 contains your capped [-0.2, 0.2] range
       break;
     case DeployState::kStowed:
       m_deployController.SetSetpoint(
           IntakeConstants::kStowedAngleDeg,
-          rev::spark::SparkLowLevel::ControlType::kPosition, rev::spark::ClosedLoopSlot::kSlot0);
+          rev::spark::SparkLowLevel::ControlType::kPosition, 
+          rev::spark::ClosedLoopSlot::kSlot0);
       break;
   }
 }

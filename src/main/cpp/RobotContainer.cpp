@@ -171,17 +171,6 @@ void RobotContainer::ConfigureBindings() {
       // Gyro resets after the Start and Back Button on the controllers are pressed simultaneously. This is useful for field-centric driving.
     (joystick.Start() && joystick.Back())
       .OnTrue(drivetrain.RunOnce([this] { drivetrain.SeedFieldCentric(); }));
-  joystick.B().WhileTrue(
-      drivetrain
-          .ApplyRequest([this]() -> auto&& {
-            return point.WithModuleDirection(
-                frc::Rotation2d{-joystick.GetLeftY(), -joystick.GetLeftX()});
-          })
-          .AlongWith(frc2::cmd::Run(
-              [this] {
-                intake.SetRollerState(IntakeSubsystem::RollerState::kIdle);
-              },
-              {&intake})));
 
   // Right trigger held: turn to face hub (back of robot). Drive freely while
   // rotating; brake when sticks idle and aimed. Also agitates the intake
@@ -285,6 +274,16 @@ void RobotContainer::ConfigureBindings() {
       frc2::cmd::RunOnce([this] {
         intake.SetDeployState(IntakeSubsystem::DeployState::kStowed);
         intake.SetRollerState(IntakeSubsystem::RollerState::kIdle);
+      }, {&intake}));
+
+    joystick.X().OnTrue(
+      frc2::cmd::RunOnce([this] {
+     intake.SetDeployState(IntakeSubsystem::DeployState::kAgitating);        
+     intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking);
+      }, {&intake})).OnFalse(
+      frc2::cmd::RunOnce([this] {
+     intake.SetDeployState(IntakeSubsystem::DeployState::kDeployed);        
+      intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking);
       }, {&intake}));
   // Run SysId routines when holding back/start and X/Y.
   // Note that each routine should be run exactly once in a single log.
