@@ -112,25 +112,6 @@ void RobotContainer::ConfigureBindings() {
     joystick.GetHID().SetRumble(frc::GenericHID::RumbleType::kBothRumble, 0.0);
   }));
 
-  auto intakeDeployCommand = frc2::cmd::RunOnce(
-              [this] {
-                intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking);
-                intake.SetDeployState(IntakeSubsystem::DeployState::kDeployed);
-              },
-              {&intake});
-  
-  auto intakeStowCommand = frc2::cmd::RunOnce(
-              [this] {
-                intake.SetRollerState(IntakeSubsystem::RollerState::kIdle);
-                intake.SetDeployState(IntakeSubsystem::DeployState::kStowed);
-              },
-              {&intake});
-  auto intakeAgitateCommand = frc2::cmd::RunOnce(
-              [this] {
-                intake.SetDeployState(IntakeSubsystem::DeployState::kAgitating);
-                intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking);
-              },
-              {&intake});
   // Reset shooter/feeder when teleop starts so auto-shoot state doesn't
   // carry over from autonomous.
   frc2::RobotModeTriggers::Teleop().OnTrue(frc2::cmd::RunOnce(
@@ -139,7 +120,10 @@ void RobotContainer::ConfigureBindings() {
         shooter.SetHoodAngle(ShooterConstants::kHoodMinDegrees);
         feeder.SetState(FeederSubsystem::FeederState::kIdle);
       },
-      {&shooter, &feeder}).AndThen(std::move(intakeDeployCommand)));
+      {&shooter, &feeder}).AndThen(frc2::cmd::RunOnce([this] {
+        intake.SetDeployState(IntakeSubsystem::DeployState::kDeployed);
+        intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking);
+      }, {&intake})));
 
   // Feed the aim subsystem the current robot pose every loop
   aim.SetDefaultCommand(frc2::cmd::Run(
@@ -284,15 +268,24 @@ void RobotContainer::ConfigureBindings() {
             // down)
             
           },
-          {&shooter, &intake, &feeder}).AndThen(std::move(intakeDeployCommand)));
+          {&shooter, &intake, &feeder}).AndThen(frc2::cmd::RunOnce([this] {
+            intake.SetDeployState(IntakeSubsystem::DeployState::kDeployed);
+            intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking);
+          }, {&intake})));
 
   // Left trigger: enable intake rollers and deploy intake
   joystick.LeftTrigger(0.3).OnTrue(
-      std::move(intakeDeployCommand));
+      frc2::cmd::RunOnce([this] {
+        intake.SetDeployState(IntakeSubsystem::DeployState::kDeployed);
+        intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking);
+      }, {&intake}));
 
   // Left bumper: stop rollers and stow intake
   joystick.LeftBumper().OnTrue(
-      std::move(intakeStowCommand));
+      frc2::cmd::RunOnce([this] {
+        intake.SetDeployState(IntakeSubsystem::DeployState::kStowed);
+        intake.SetRollerState(IntakeSubsystem::RollerState::kIdle);
+      }, {&intake}));
   // Run SysId routines when holding back/start and X/Y.
   // Note that each routine should be run exactly once in a single log.
   // (joystick.Back() && joystick.Y())
