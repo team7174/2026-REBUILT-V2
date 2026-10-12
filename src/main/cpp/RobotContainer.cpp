@@ -184,7 +184,8 @@ void RobotContainer::ConfigureBindings() {
         m_manualFeedOverride = false;
         feeder.SetState(FeederSubsystem::FeederState::kIdle);
       }));
-  joystick.POVUp()
+      // Gyro resets after the Start and Back Button on the controllers are pressed simultaneously. This is useful for field-centric driving.
+    (joystick.Start() && joystick.Back())
       .OnTrue(drivetrain.RunOnce([this] { drivetrain.SeedFieldCentric(); }));
   joystick.B().WhileTrue(
       drivetrain

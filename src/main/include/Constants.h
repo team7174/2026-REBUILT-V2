@@ -145,9 +145,6 @@ constexpr double kDeployedAngleDeg = 0.0;    // down, starting position
 constexpr double kStowedAngleDeg = 110.0;    // up
 constexpr double kDeployToleranceDeg = 2.0;  // acceptable error
 
-// Agitate (shooting): slowly raise the intake to this angle and hold it
-constexpr double kAgitateAngleDeg = 110.0;
-constexpr double kAgitateSpeedDegPerSec = 30.0;  // ramp rate while agitating
 
 // Deploy PID (position control, slot 0) — input/output in degrees
 constexpr double kDeployP = 0.015;

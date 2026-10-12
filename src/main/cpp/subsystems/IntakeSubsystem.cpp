@@ -87,7 +87,7 @@ void IntakeSubsystem::SetDeployState(DeployState state) {
       break;
     case DeployState::kAgitating:
       m_deployController.SetSetpoint(
-          IntakeConstants::kAgitateAngleDeg,
+          IntakeConstants::kStowedAngleDeg,
           rev::spark::SparkLowLevel::ControlType::kPosition, rev::spark::ClosedLoopSlot::kSlot1);
       break;
     case DeployState::kStowed:
