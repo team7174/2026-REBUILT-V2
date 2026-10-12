@@ -46,7 +46,7 @@ void IntakeSubsystem::ConfigureMotors() {
   deployConfig.closedLoop.SetFeedbackSensor(rev::spark::kPrimaryEncoder)
       .Pid(IntakeConstants::kDeployP, IntakeConstants::kDeployI,
            IntakeConstants::kDeployD)
-      .OutputRange(-0.8, 0.8);
+      .OutputRange(-1, 1);
 
   m_deployMotor.Configure(deployConfig, rev::ResetMode::kResetSafeParameters,
                           rev::PersistMode::kPersistParameters);

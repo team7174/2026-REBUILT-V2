@@ -56,8 +56,11 @@ class RobotContainer {
 
   frc2::CommandXboxController joystick{0};
 
-  // Timer used to oscillate the intake deploy angle when agitating
+  // Timer used to slowly ramp the intake deploy angle when agitating
   frc::Timer m_agitateTimer;
+
+  // Intake angle when agitation started — the ramp begins from here
+  double m_agitateStartAngleDeg = 0.0;
 
   // Whether intake is enabled (left trigger on, left bumper off)
   bool m_intakeOn = true;
@@ -85,4 +88,7 @@ class RobotContainer {
 
  private:
   void ConfigureBindings();
+
+  /** Slowly raise the intake to kAgitateAngleDeg, then hold it there. */
+  void Agitate();
 };

@@ -11,6 +11,7 @@
 #include <pathplanner/lib/auto/AutoBuilder.h>
 #include <pathplanner/lib/auto/NamedCommands.h>
 
+#include <algorithm>
 #include <cmath>
 
 RobotContainer::RobotContainer() {
@@ -56,23 +57,8 @@ RobotContainer::RobotContainer() {
           .AlongWith(frc2::cmd::Run(
               [this] { shooter.SetFromDistance(aim.distance.value()); },
               {&shooter}))
-          // 3. Agitate the intake to help move stuck balls
-          .AlongWith(frc2::cmd::Run(
-              [this] {
-                if (!m_agitateTimer.IsRunning()) {
-                  m_agitateTimer.Restart();
-                }
-
-                double elapsed = m_agitateTimer.Get().value();
-                bool isRaised =
-                    (static_cast<int>(elapsed / 0.4) % 2) == 1;
-
-                double targetAngleDeg =
-                    IntakeConstants::kDeployedAngleDeg +
-                    (isRaised ? 70.0 : 0.0);
-                intake.SetTargetAngleDeg(targetAngleDeg);
-              },
-              {&intake}))
+          // 3. Agitate: slowly raise the intake to help move stuck balls
+          .AlongWith(frc2::cmd::Run([this] { Agitate(); }, {&intake}))
           // 4. Feed only when aimed, at speed, and hood is ready
           .AlongWith(frc2::cmd::Run(
               [this] {
@@ -198,6 +184,8 @@ void RobotContainer::ConfigureBindings() {
         m_manualFeedOverride = false;
         feeder.SetState(FeederSubsystem::FeederState::kIdle);
       }));
+  joystick.POVUp()
+      .OnTrue(drivetrain.RunOnce([this] { drivetrain.SeedFieldCentric(); }));
   joystick.B().WhileTrue(
       drivetrain
           .ApplyRequest([this]() -> auto&& {
@@ -212,7 +200,8 @@ void RobotContainer::ConfigureBindings() {
 
   // Right trigger held: turn to face hub (back of robot). Drive freely while
   // rotating; brake when sticks idle and aimed. Also agitates the intake
-  // up and down to help move stuck balls. Spins up the shooter while held.
+  // (slowly raises it, then holds) to help move stuck balls. Spins up the
+  // shooter while held.
   // Rollers are OFF during shooting to avoid feeding extra balls.
   // Feeder auto-engages once the flywheel is stable at speed.
   joystick.RightTrigger(0.3)
@@ -247,21 +236,8 @@ void RobotContainer::ConfigureBindings() {
                   [this] {
                     // Only agitate when shooting at the hub, not when passing
                     if (!aim.IsPassingMode()) {
-                      // Start the agitate timer on first loop
-                      if (!m_agitateTimer.IsRunning()) {
-                        m_agitateTimer.Restart();
-                      }
-
-                      // Oscillate deploy angle every 0.4 s (0.8 s full
-                      // cycle)
-                      double elapsed = m_agitateTimer.Get().value();
-                      bool isRaised =
-                          (static_cast<int>(elapsed / 0.4) % 2) == 1;
-
-                      double targetAngleDeg =
-                          IntakeConstants::kDeployedAngleDeg +
-                          (isRaised ? 70.0 : 0.0);
-                      intake.SetTargetAngleDeg(targetAngleDeg);
+                      // Slowly raise the intake, then hold at the top
+                      Agitate();
                     } else {
                       // Passing — hold deployed angle, no agitation
                       m_agitateTimer.Stop();
@@ -333,6 +309,21 @@ void RobotContainer::ConfigureBindings() {
 
   drivetrain.RegisterTelemetry(
       [this](auto const& state) { logger.Telemeterize(state); });
+}
+
+void RobotContainer::Agitate() {
+  // Start the ramp from wherever the intake is right now
+  if (!m_agitateTimer.IsRunning()) {
+    m_agitateTimer.Restart();
+    m_agitateStartAngleDeg = intake.GetAngleDeg();
+  }
+
+  // Raise at a constant slow rate, then hold at kAgitateAngleDeg
+  double elapsed = m_agitateTimer.Get().value();
+  double targetAngleDeg = std::min(
+      m_agitateStartAngleDeg + IntakeConstants::kAgitateSpeedDegPerSec * elapsed,
+      IntakeConstants::kAgitateAngleDeg);
+  intake.SetTargetAngleDeg(targetAngleDeg);
 }
 
 frc2::Command* RobotContainer::GetAutonomousCommand() {
