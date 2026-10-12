@@ -17,7 +17,8 @@ class IntakeSubsystem : public frc2::SubsystemBase {
   // ── States ────────────────────────────────────────────────────────────────
   enum class DeployState {
     kDeployed,  // pivot at 0 deg (down)
-    kStowed     // pivot at 90 deg (up)
+    kStowed, // pivot at 110 deg (up)
+    kAgitating   
   };
 
   enum class RollerState {
@@ -34,10 +35,6 @@ class IntakeSubsystem : public frc2::SubsystemBase {
   // ── State setters ─────────────────────────────────────────────────────────
   /** Set the desired deploy state: kDeployed (0 deg) or kStowed (90 deg). */
   void SetDeployState(DeployState state);
-
-  /** Set the deploy pivot to an arbitrary angle (degrees). Used for agitation.
-   *  Does not change m_deployState so the subsystem can resume normally. */
-  void SetTargetAngleDeg(double angleDeg);
 
   /** Set the desired roller state. kUnjamming is managed automatically by
    * Periodic. */

@@ -11,7 +11,6 @@
 #include <pathplanner/lib/auto/AutoBuilder.h>
 #include <pathplanner/lib/auto/NamedCommands.h>
 
-#include <algorithm>
 #include <cmath>
 
 RobotContainer::RobotContainer() {
@@ -29,13 +28,12 @@ RobotContainer::RobotContainer() {
   // "Intake On" — turns on intake rollers for the duration of the path event.
   pathplanner::NamedCommands::registerCommand(
       "Intake",
-      frc2::cmd::RunOnce([this] { m_intakeOn = true; })
-          .AndThen(frc2::cmd::RunOnce(
+      frc2::cmd::RunOnce(
               [this] {
                 intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking);
                 intake.SetDeployState(IntakeSubsystem::DeployState::kDeployed);
               },
-              {&intake})));
+              {&intake}));
 
   // "Auto Shoot" — turns to face the hub (back of robot), spins up the
   // shooter, feeds once flywheel + hood are stable and aimed, then stops.
@@ -58,7 +56,7 @@ RobotContainer::RobotContainer() {
               [this] { shooter.SetFromDistance(aim.distance.value()); },
               {&shooter}))
           // 3. Agitate: slowly raise the intake to help move stuck balls
-          .AlongWith(frc2::cmd::Run([this] { Agitate(); }, {&intake}))
+          .AlongWith(frc2::cmd::Run([this] { intake.SetDeployState(IntakeSubsystem::DeployState::kAgitating); intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking); }, {&intake}))
           // 4. Feed only when aimed, at speed, and hood is ready
           .AlongWith(frc2::cmd::Run(
               [this] {
@@ -81,7 +79,6 @@ RobotContainer::RobotContainer() {
                 shooter.SetRunning(false);
                 shooter.SetHoodAngle(ShooterConstants::kHoodMinDegrees);
                 feeder.SetState(FeederSubsystem::FeederState::kIdle);
-                m_agitateTimer.Stop();
               },
               {&shooter, &feeder})));
 
@@ -115,6 +112,25 @@ void RobotContainer::ConfigureBindings() {
     joystick.GetHID().SetRumble(frc::GenericHID::RumbleType::kBothRumble, 0.0);
   }));
 
+  auto intakeDeployCommand = frc2::cmd::RunOnce(
+              [this] {
+                intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking);
+                intake.SetDeployState(IntakeSubsystem::DeployState::kDeployed);
+              },
+              {&intake});
+  
+  auto intakeStowCommand = frc2::cmd::RunOnce(
+              [this] {
+                intake.SetRollerState(IntakeSubsystem::RollerState::kIdle);
+                intake.SetDeployState(IntakeSubsystem::DeployState::kStowed);
+              },
+              {&intake});
+  auto intakeAgitateCommand = frc2::cmd::RunOnce(
+              [this] {
+                intake.SetDeployState(IntakeSubsystem::DeployState::kAgitating);
+                intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking);
+              },
+              {&intake});
   // Reset shooter/feeder when teleop starts so auto-shoot state doesn't
   // carry over from autonomous.
   frc2::RobotModeTriggers::Teleop().OnTrue(frc2::cmd::RunOnce(
@@ -122,9 +138,8 @@ void RobotContainer::ConfigureBindings() {
         shooter.SetRunning(false);
         shooter.SetHoodAngle(ShooterConstants::kHoodMinDegrees);
         feeder.SetState(FeederSubsystem::FeederState::kIdle);
-        m_intakeOn = true;
       },
-      {&shooter, &feeder}));
+      {&shooter, &feeder}).AndThen(std::move(intakeDeployCommand)));
 
   // Feed the aim subsystem the current robot pose every loop
   aim.SetDefaultCommand(frc2::cmd::Run(
@@ -135,21 +150,6 @@ void RobotContainer::ConfigureBindings() {
   shooter.SetDefaultCommand(
       frc2::cmd::RunOnce([this] { shooter.SetRunning(false); }, {&shooter})
           .AndThen(frc2::cmd::Idle({&shooter})));
-
-  // Intake default command — deploy chain broken, so intake stays down always.
-  // Rollers run based on m_intakeOn flag (controlled by left trigger / bumper).
-  intake.SetDefaultCommand(frc2::cmd::Run(
-      [this] {
-        // Deploy motor disabled (chain broken) — do not command position
-        if (m_intakeOn) {
-          intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking);
-          intake.SetDeployState(IntakeSubsystem::DeployState::kDeployed);
-        } else {
-          intake.SetRollerState(IntakeSubsystem::RollerState::kIdle);
-          intake.SetDeployState(IntakeSubsystem::DeployState::kStowed);
-        }
-      },
-      {&intake}));
 
   // Note that X is defined as forward according to WPILib convention,
   // and Y is defined as to the left according to WPILib convention.
@@ -237,12 +237,12 @@ void RobotContainer::ConfigureBindings() {
                     // Only agitate when shooting at the hub, not when passing
                     if (!aim.IsPassingMode()) {
                       // Slowly raise the intake, then hold at the top
-                      Agitate();
+                      intake.SetDeployState(IntakeSubsystem::DeployState::kAgitating);
+                      intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking);
                     } else {
                       // Passing — hold deployed angle, no agitation
-                      m_agitateTimer.Stop();
-                      intake.SetTargetAngleDeg(
-                          IntakeConstants::kDeployedAngleDeg);
+                      intake.SetDeployState(IntakeSubsystem::DeployState::kDeployed);
+                      intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking);
                     }
                   },
                   {&intake}))
@@ -279,23 +279,19 @@ void RobotContainer::ConfigureBindings() {
             shooter.SetHoodAngle(ShooterConstants::kHoodMinDegrees);
             feeder.SetState(FeederSubsystem::FeederState::kIdle);
             m_manualFeedOverride = false;
-            m_agitateTimer.Stop();
             // Resume intaking — rollers back on (deploy chain broken, stays
             // down)
-            m_intakeOn = true;
-            intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking);
+            
           },
-          {&shooter, &intake, &feeder}));
+          {&shooter, &intake, &feeder}).AndThen(std::move(intakeDeployCommand)));
 
-  // Left trigger: enable intake rollers (deploy chain broken — no deploy
-  // command).
+  // Left trigger: enable intake rollers and deploy intake
   joystick.LeftTrigger(0.3).OnTrue(
-      frc2::cmd::RunOnce([this] { m_intakeOn = true; }));
+      std::move(intakeDeployCommand));
 
-  // Left bumper: stop rollers (deploy chain broken — no stow command).
+  // Left bumper: stop rollers and stow intake
   joystick.LeftBumper().OnTrue(
-      frc2::cmd::RunOnce([this] { m_intakeOn = false; }));
-
+      std::move(intakeStowCommand));
   // Run SysId routines when holding back/start and X/Y.
   // Note that each routine should be run exactly once in a single log.
   // (joystick.Back() && joystick.Y())
@@ -310,22 +306,7 @@ void RobotContainer::ConfigureBindings() {
   drivetrain.RegisterTelemetry(
       [this](auto const& state) { logger.Telemeterize(state); });
 }
-
-void RobotContainer::Agitate() {
-  // Start the ramp from wherever the intake is right now
-  if (!m_agitateTimer.IsRunning()) {
-    m_agitateTimer.Restart();
-    m_agitateStartAngleDeg = intake.GetAngleDeg();
-  }
-
-  // Raise at a constant slow rate, then hold at kAgitateAngleDeg
-  double elapsed = m_agitateTimer.Get().value();
-  double targetAngleDeg = std::min(
-      m_agitateStartAngleDeg + IntakeConstants::kAgitateSpeedDegPerSec * elapsed,
-      IntakeConstants::kAgitateAngleDeg);
-  intake.SetTargetAngleDeg(targetAngleDeg);
-}
-
+ 
 frc2::Command* RobotContainer::GetAutonomousCommand() {
   return m_autoChooser.GetSelected();
 }
