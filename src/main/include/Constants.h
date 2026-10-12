@@ -145,6 +145,7 @@ constexpr double kDeployedAngleDeg = 0.0;    // down, starting position
 constexpr double kStowedAngleDeg = 110.0;    // up
 constexpr double kDeployToleranceDeg = 2.0;  // acceptable error
 
+
 // Deploy PID (position control, slot 0) — input/output in degrees
 constexpr double kDeployP = 0.015;
 constexpr double kDeployI = 0.0;

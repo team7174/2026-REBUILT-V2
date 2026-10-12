@@ -28,13 +28,12 @@ RobotContainer::RobotContainer() {
   // "Intake On" — turns on intake rollers for the duration of the path event.
   pathplanner::NamedCommands::registerCommand(
       "Intake",
-      frc2::cmd::RunOnce([this] { m_intakeOn = true; })
-          .AndThen(frc2::cmd::RunOnce(
+      frc2::cmd::RunOnce(
               [this] {
                 intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking);
                 intake.SetDeployState(IntakeSubsystem::DeployState::kDeployed);
               },
-              {&intake})));
+              {&intake}));
 
   // "Auto Shoot" — turns to face the hub (back of robot), spins up the
   // shooter, feeds once flywheel + hood are stable and aimed, then stops.
@@ -56,23 +55,8 @@ RobotContainer::RobotContainer() {
           .AlongWith(frc2::cmd::Run(
               [this] { shooter.SetFromDistance(aim.distance.value()); },
               {&shooter}))
-          // 3. Agitate the intake to help move stuck balls
-          .AlongWith(frc2::cmd::Run(
-              [this] {
-                if (!m_agitateTimer.IsRunning()) {
-                  m_agitateTimer.Restart();
-                }
-
-                double elapsed = m_agitateTimer.Get().value();
-                bool isRaised =
-                    (static_cast<int>(elapsed / 0.4) % 2) == 1;
-
-                double targetAngleDeg =
-                    IntakeConstants::kDeployedAngleDeg +
-                    (isRaised ? 70.0 : 0.0);
-                intake.SetTargetAngleDeg(targetAngleDeg);
-              },
-              {&intake}))
+          // 3. Agitate: slowly raise the intake to help move stuck balls
+          .AlongWith(frc2::cmd::Run([this] { intake.SetDeployState(IntakeSubsystem::DeployState::kAgitating); intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking); }, {&intake}))
           // 4. Feed only when aimed, at speed, and hood is ready
           .AlongWith(frc2::cmd::Run(
               [this] {
@@ -95,7 +79,6 @@ RobotContainer::RobotContainer() {
                 shooter.SetRunning(false);
                 shooter.SetHoodAngle(ShooterConstants::kHoodMinDegrees);
                 feeder.SetState(FeederSubsystem::FeederState::kIdle);
-                m_agitateTimer.Stop();
               },
               {&shooter, &feeder})));
 
@@ -136,9 +119,11 @@ void RobotContainer::ConfigureBindings() {
         shooter.SetRunning(false);
         shooter.SetHoodAngle(ShooterConstants::kHoodMinDegrees);
         feeder.SetState(FeederSubsystem::FeederState::kIdle);
-        m_intakeOn = true;
       },
-      {&shooter, &feeder}));
+      {&shooter, &feeder}).AndThen(frc2::cmd::RunOnce([this] {
+        intake.SetDeployState(IntakeSubsystem::DeployState::kDeployed);
+        intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking);
+      }, {&intake})));
 
   // Feed the aim subsystem the current robot pose every loop
   aim.SetDefaultCommand(frc2::cmd::Run(
@@ -149,21 +134,6 @@ void RobotContainer::ConfigureBindings() {
   shooter.SetDefaultCommand(
       frc2::cmd::RunOnce([this] { shooter.SetRunning(false); }, {&shooter})
           .AndThen(frc2::cmd::Idle({&shooter})));
-
-  // Intake default command — deploy chain broken, so intake stays down always.
-  // Rollers run based on m_intakeOn flag (controlled by left trigger / bumper).
-  intake.SetDefaultCommand(frc2::cmd::Run(
-      [this] {
-        // Deploy motor disabled (chain broken) — do not command position
-        if (m_intakeOn) {
-          intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking);
-          intake.SetDeployState(IntakeSubsystem::DeployState::kDeployed);
-        } else {
-          intake.SetRollerState(IntakeSubsystem::RollerState::kIdle);
-          intake.SetDeployState(IntakeSubsystem::DeployState::kStowed);
-        }
-      },
-      {&intake}));
 
   // Note that X is defined as forward according to WPILib convention,
   // and Y is defined as to the left according to WPILib convention.
@@ -198,21 +168,14 @@ void RobotContainer::ConfigureBindings() {
         m_manualFeedOverride = false;
         feeder.SetState(FeederSubsystem::FeederState::kIdle);
       }));
-  joystick.B().WhileTrue(
-      drivetrain
-          .ApplyRequest([this]() -> auto&& {
-            return point.WithModuleDirection(
-                frc::Rotation2d{-joystick.GetLeftY(), -joystick.GetLeftX()});
-          })
-          .AlongWith(frc2::cmd::Run(
-              [this] {
-                intake.SetRollerState(IntakeSubsystem::RollerState::kIdle);
-              },
-              {&intake})));
+      // Gyro resets after the Start and Back Button on the controllers are pressed simultaneously. This is useful for field-centric driving.
+    (joystick.Start() && joystick.Back())
+      .OnTrue(drivetrain.RunOnce([this] { drivetrain.SeedFieldCentric(); }));
 
   // Right trigger held: turn to face hub (back of robot). Drive freely while
   // rotating; brake when sticks idle and aimed. Also agitates the intake
-  // up and down to help move stuck balls. Spins up the shooter while held.
+  // (slowly raises it, then holds) to help move stuck balls. Spins up the
+  // shooter while held.
   // Rollers are OFF during shooting to avoid feeding extra balls.
   // Feeder auto-engages once the flywheel is stable at speed.
   joystick.RightTrigger(0.3)
@@ -247,26 +210,13 @@ void RobotContainer::ConfigureBindings() {
                   [this] {
                     // Only agitate when shooting at the hub, not when passing
                     if (!aim.IsPassingMode()) {
-                      // Start the agitate timer on first loop
-                      if (!m_agitateTimer.IsRunning()) {
-                        m_agitateTimer.Restart();
-                      }
-
-                      // Oscillate deploy angle every 0.4 s (0.8 s full
-                      // cycle)
-                      double elapsed = m_agitateTimer.Get().value();
-                      bool isRaised =
-                          (static_cast<int>(elapsed / 0.4) % 2) == 1;
-
-                      double targetAngleDeg =
-                          IntakeConstants::kDeployedAngleDeg +
-                          (isRaised ? 70.0 : 0.0);
-                      intake.SetTargetAngleDeg(targetAngleDeg);
+                      // Slowly raise the intake, then hold at the top
+                      intake.SetDeployState(IntakeSubsystem::DeployState::kAgitating);
+                      intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking);
                     } else {
                       // Passing — hold deployed angle, no agitation
-                      m_agitateTimer.Stop();
-                      intake.SetTargetAngleDeg(
-                          IntakeConstants::kDeployedAngleDeg);
+                      intake.SetDeployState(IntakeSubsystem::DeployState::kDeployed);
+                      intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking);
                     }
                   },
                   {&intake}))
@@ -303,23 +253,38 @@ void RobotContainer::ConfigureBindings() {
             shooter.SetHoodAngle(ShooterConstants::kHoodMinDegrees);
             feeder.SetState(FeederSubsystem::FeederState::kIdle);
             m_manualFeedOverride = false;
-            m_agitateTimer.Stop();
             // Resume intaking — rollers back on (deploy chain broken, stays
             // down)
-            m_intakeOn = true;
-            intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking);
+            
           },
-          {&shooter, &intake, &feeder}));
+          {&shooter, &intake, &feeder}).AndThen(frc2::cmd::RunOnce([this] {
+            intake.SetDeployState(IntakeSubsystem::DeployState::kDeployed);
+            intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking);
+          }, {&intake})));
 
-  // Left trigger: enable intake rollers (deploy chain broken — no deploy
-  // command).
+  // Left trigger: enable intake rollers and deploy intake
   joystick.LeftTrigger(0.3).OnTrue(
-      frc2::cmd::RunOnce([this] { m_intakeOn = true; }));
+      frc2::cmd::RunOnce([this] {
+        intake.SetDeployState(IntakeSubsystem::DeployState::kDeployed);
+        intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking);
+      }, {&intake}));
 
-  // Left bumper: stop rollers (deploy chain broken — no stow command).
+  // Left bumper: stop rollers and stow intake
   joystick.LeftBumper().OnTrue(
-      frc2::cmd::RunOnce([this] { m_intakeOn = false; }));
+      frc2::cmd::RunOnce([this] {
+        intake.SetDeployState(IntakeSubsystem::DeployState::kStowed);
+        intake.SetRollerState(IntakeSubsystem::RollerState::kIdle);
+      }, {&intake}));
 
+    joystick.X().OnTrue(
+      frc2::cmd::RunOnce([this] {
+     intake.SetDeployState(IntakeSubsystem::DeployState::kAgitating);        
+     intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking);
+      }, {&intake})).OnFalse(
+      frc2::cmd::RunOnce([this] {
+     intake.SetDeployState(IntakeSubsystem::DeployState::kDeployed);        
+      intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking);
+      }, {&intake}));
   // Run SysId routines when holding back/start and X/Y.
   // Note that each routine should be run exactly once in a single log.
   // (joystick.Back() && joystick.Y())
@@ -334,7 +299,7 @@ void RobotContainer::ConfigureBindings() {
   drivetrain.RegisterTelemetry(
       [this](auto const& state) { logger.Telemeterize(state); });
 }
-
+ 
 frc2::Command* RobotContainer::GetAutonomousCommand() {
   return m_autoChooser.GetSelected();
 }
