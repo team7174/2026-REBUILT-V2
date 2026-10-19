@@ -173,8 +173,9 @@ void RobotContainer::ConfigureBindings() {
       .OnTrue(drivetrain.RunOnce([this] { drivetrain.SeedFieldCentric(); }));
 
   // Right trigger held: turn to face hub (back of robot). Drive freely while
-  // rotating; brake when sticks idle and aimed. Also agitates the intake
-  // (slowly raises it, then holds) to help move stuck balls. Spins up the
+  // rotating; brake when sticks idle and aimed. After a 1 second delay, also
+  // agitates the intake (slowly raises it, then holds) to help move stuck
+  // balls. Spins up the
   // shooter while held.
   // Rollers are OFF during shooting to avoid feeding extra balls.
   // Feeder auto-engages once the flywheel is stable at speed.
@@ -206,7 +207,7 @@ void RobotContainer::ConfigureBindings() {
                     }
                   },
                   {&shooter}))
-              .AlongWith(frc2::cmd::Run(
+              .AlongWith(frc2::cmd::Wait(1_s).AndThen(frc2::cmd::Run(
                   [this] {
                     // Only agitate when shooting at the hub, not when passing
                     if (!aim.IsPassingMode()) {
@@ -219,7 +220,7 @@ void RobotContainer::ConfigureBindings() {
                       intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking);
                     }
                   },
-                  {&intake}))
+                  {&intake})))
               .AlongWith(frc2::cmd::Run(
                   [this] {
                     // All three conditions must be met before feeding:
