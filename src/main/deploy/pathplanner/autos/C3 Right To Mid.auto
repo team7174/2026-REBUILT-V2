@@ -7,7 +7,13 @@
         {
           "type": "path",
           "data": {
-            "pathName": "Right to Mid"
+            "pathName": "New Initial Right"
+          }
+        },
+        {
+          "type": "named",
+          "data": {
+            "name": "AutoShoot"
           }
         },
         {
@@ -19,19 +25,13 @@
         {
           "type": "path",
           "data": {
-            "pathName": "Right Intake"
+            "pathName": "Shoot to Right"
           }
         },
         {
           "type": "path",
           "data": {
-            "pathName": "Right to Shoot"
-          }
-        },
-        {
-          "type": "path",
-          "data": {
-            "pathName": "Right to HP"
+            "pathName": "New Second Right"
           }
         },
         {
@@ -39,11 +39,29 @@
           "data": {
             "name": "AutoShoot"
           }
+        },
+        {
+          "type": "named",
+          "data": {
+            "name": "Intake"
+          }
+        },
+        {
+          "type": "path",
+          "data": {
+            "pathName": "Shoot to Right"
+          }
+        },
+        {
+          "type": "path",
+          "data": {
+            "pathName": "New Second Right"
+          }
         }
       ]
     }
   },
   "resetOdom": true,
-  "folder": null,
+  "folder": "C3",
   "choreoAuto": false
 }

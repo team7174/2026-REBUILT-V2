@@ -43,10 +43,18 @@ void IntakeSubsystem::ConfigureMotors() {
       .ReverseSoftLimit(IntakeConstants::kDeployedAngleDeg)
       .ReverseSoftLimitEnabled(true);
 
-  deployConfig.closedLoop.SetFeedbackSensor(rev::spark::kPrimaryEncoder)
+  // Configure Slot 0
+deployConfig.closedLoop
+    .SetFeedbackSensor(rev::spark::kPrimaryEncoder)
+    .Pid(IntakeConstants::kDeployP, IntakeConstants::kDeployI,
+         IntakeConstants::kDeployD, rev::spark::ClosedLoopSlot::kSlot0) 
+    .OutputRange(-0.8, 0.8, rev::spark::ClosedLoopSlot::kSlot0);
+
+  // Configure Slot 1
+  deployConfig.closedLoop
       .Pid(IntakeConstants::kDeployP, IntakeConstants::kDeployI,
-           IntakeConstants::kDeployD)
-      .OutputRange(-0.8, 0.8);
+           IntakeConstants::kDeployD, rev::spark::ClosedLoopSlot::kSlot1) 
+      .OutputRange(-0.2, 0.2, rev::spark::ClosedLoopSlot::kSlot1);
 
   m_deployMotor.Configure(deployConfig, rev::ResetMode::kResetSafeParameters,
                           rev::PersistMode::kPersistParameters);
@@ -74,22 +82,26 @@ void IntakeSubsystem::ConfigureMotors() {
 
 void IntakeSubsystem::SetDeployState(DeployState state) {
   m_deployState = state;
-  m_targetAngleDeg = (state == DeployState::kStowed)
-                         ? IntakeConstants::kStowedAngleDeg
-                         : IntakeConstants::kDeployedAngleDeg;
-  // TEMPORARILY DISABLED — intake deploy chain broken
-  m_deployController.SetSetpoint(
-      m_targetAngleDeg, rev::spark::SparkLowLevel::ControlType::kPosition);
-}
-
-void IntakeSubsystem::SetTargetAngleDeg(double angleDeg) {
-  // Clamp to valid range so we don't exceed soft limits
-  angleDeg = std::clamp(angleDeg, IntakeConstants::kDeployedAngleDeg,
-                        IntakeConstants::kStowedAngleDeg);
-  m_targetAngleDeg = angleDeg;
-  // TEMPORARILY DISABLED — intake deploy chain broken
-  m_deployController.SetSetpoint(
-      m_targetAngleDeg, rev::spark::SparkLowLevel::ControlType::kPosition);
+  switch (m_deployState) {
+    case DeployState::kDeployed:
+      m_deployController.SetSetpoint(
+          IntakeConstants::kDeployedAngleDeg,
+          rev::spark::SparkLowLevel::ControlType::kPosition, 
+          rev::spark::ClosedLoopSlot::kSlot0);
+      break;
+    case DeployState::kAgitating:
+      m_deployController.SetSetpoint(
+          IntakeConstants::kStowedAngleDeg,
+          rev::spark::SparkLowLevel::ControlType::kPosition, 
+          rev::spark::ClosedLoopSlot::kSlot1); // Slot 1 contains your capped [-0.2, 0.2] range
+      break;
+    case DeployState::kStowed:
+      m_deployController.SetSetpoint(
+          IntakeConstants::kStowedAngleDeg,
+          rev::spark::SparkLowLevel::ControlType::kPosition, 
+          rev::spark::ClosedLoopSlot::kSlot0);
+      break;
+  }
 }
 
 void IntakeSubsystem::SetRollerState(RollerState state) {
@@ -206,7 +218,7 @@ void IntakeSubsystem::Periodic() {
       m_deployState == DeployState::kStowed ? "Stowed" : "Deployed");
   frc::SmartDashboard::PutString(
       "Intake/RollerState",
-      m_rollerState == RollerState::kIdle        ? "Idle"
+      m_rollerState == RollerState::kIdle        ? "Idle" 
       : m_rollerState == RollerState::kIntaking  ? "Intaking"
       : m_rollerState == RollerState::kOuttaking ? "Outtaking"
       : m_rollerState == RollerState::kEjecting  ? "Ejecting"

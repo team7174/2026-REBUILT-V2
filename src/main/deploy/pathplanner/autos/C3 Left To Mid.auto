@@ -7,7 +7,13 @@
         {
           "type": "path",
           "data": {
-            "pathName": "Initial Left"
+            "pathName": "New Initial Left"
+          }
+        },
+        {
+          "type": "named",
+          "data": {
+            "name": "AutoShoot"
           }
         },
         {
@@ -19,19 +25,13 @@
         {
           "type": "path",
           "data": {
-            "pathName": "Left Intake"
+            "pathName": "Shoot to Left"
           }
         },
         {
           "type": "path",
           "data": {
-            "pathName": "Left to Shoot"
-          }
-        },
-        {
-          "type": "path",
-          "data": {
-            "pathName": "Left to Depot"
+            "pathName": "New Second Left"
           }
         },
         {
@@ -39,11 +39,29 @@
           "data": {
             "name": "AutoShoot"
           }
+        },
+        {
+          "type": "named",
+          "data": {
+            "name": "Intake"
+          }
+        },
+        {
+          "type": "path",
+          "data": {
+            "pathName": "Shoot to Left"
+          }
+        },
+        {
+          "type": "path",
+          "data": {
+            "pathName": "New Second Left"
+          }
         }
       ]
     }
   },
   "resetOdom": true,
-  "folder": null,
+  "folder": "C3",
   "choreoAuto": false
 }
