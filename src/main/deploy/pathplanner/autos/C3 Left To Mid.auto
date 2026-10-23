@@ -1,0 +1,67 @@
+{
+  "version": "2025.0",
+  "command": {
+    "type": "sequential",
+    "data": {
+      "commands": [
+        {
+          "type": "path",
+          "data": {
+            "pathName": "New Initial Left"
+          }
+        },
+        {
+          "type": "named",
+          "data": {
+            "name": "AutoShoot"
+          }
+        },
+        {
+          "type": "named",
+          "data": {
+            "name": "Intake"
+          }
+        },
+        {
+          "type": "path",
+          "data": {
+            "pathName": "Shoot to Left"
+          }
+        },
+        {
+          "type": "path",
+          "data": {
+            "pathName": "New Second Left"
+          }
+        },
+        {
+          "type": "named",
+          "data": {
+            "name": "AutoShoot"
+          }
+        },
+        {
+          "type": "named",
+          "data": {
+            "name": "Intake"
+          }
+        },
+        {
+          "type": "path",
+          "data": {
+            "pathName": "Shoot to Left"
+          }
+        },
+        {
+          "type": "path",
+          "data": {
+            "pathName": "New Second Left"
+          }
+        }
+      ]
+    }
+  },
+  "resetOdom": true,
+  "folder": "C3",
+  "choreoAuto": false
+}
