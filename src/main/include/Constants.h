@@ -134,6 +134,7 @@ namespace IntakeConstants {
 // CAN IDs
 constexpr int kRollerID = 52;  // Neo Vortex - RIO
 constexpr int kDeployID = 53;  // Neo Vortex - RIO
+constexpr int kFollowerID = 55;
 
 // Deploy mechanism geometry
 // Motor → 36:1 gearbox → 12T sprocket → 28T sprocket → intake pivot

@@ -8,7 +8,7 @@
   "autoFolders": [
     "C3"
   ],
-  "defaultMaxVel": 6.0,
+  "defaultMaxVel": 2.75,
   "defaultMaxAccel": 6.0,
   "defaultMaxAngVel": 450.0,
   "defaultMaxAngAccel": 800.0,

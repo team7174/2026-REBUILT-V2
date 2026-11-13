@@ -24,7 +24,7 @@ void FeederSubsystem::ConfigureMotors() {
   rev::spark::SparkFlexConfig feederConfig{};
 
   feederConfig.Inverted(true);  // invert so positive RPM = feed direction
-  feederConfig.SmartCurrentLimit(60);  // 60A — enough headroom under ball load
+  feederConfig.SmartCurrentLimit(60.0, 40.0);  // 60A — enough headroom under ball load
   feederConfig.SetIdleMode(rev::spark::SparkBaseConfig::IdleMode::kCoast);
   feederConfig.VoltageCompensation(12.0);
 
@@ -41,7 +41,7 @@ void FeederSubsystem::ConfigureMotors() {
 
   conveyorConfig.Inverted(true);  // invert so positive RPM = feed direction
   conveyorConfig.SmartCurrentLimit(
-      60);  // 60A — enough headroom under ball load
+      40.0, 20.0);  // 60A — enough headroom under ball load
   conveyorConfig.SetIdleMode(rev::spark::SparkBaseConfig::IdleMode::kCoast);
   conveyorConfig.VoltageCompensation(12.0);
 

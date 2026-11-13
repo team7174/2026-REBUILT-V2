@@ -13,7 +13,8 @@
 
 #include <cmath>
 
-RobotContainer::RobotContainer() {
+RobotContainer::RobotContainer()
+{
   // Give the vision subsystem a reference to the drivetrain so it can
   // push MegaTag1 measurements into the pose estimator each loop.
   vision.SetDrivetrain(drivetrain);
@@ -29,11 +30,12 @@ RobotContainer::RobotContainer() {
   pathplanner::NamedCommands::registerCommand(
       "Intake",
       frc2::cmd::RunOnce(
-              [this] {
-                intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking);
-                intake.SetDeployState(IntakeSubsystem::DeployState::kDeployed);
-              },
-              {&intake}));
+          [this]
+          {
+            intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking);
+            intake.SetDeployState(IntakeSubsystem::DeployState::kDeployed);
+          },
+          {&intake}));
 
   // "Auto Shoot" — turns to face the hub (back of robot), spins up the
   // shooter, feeds once flywheel + hood are stable and aimed, then stops.
@@ -42,40 +44,47 @@ RobotContainer::RobotContainer() {
       "AutoShoot",
       // 1. Turn to face hub — keep translating at zero while locking heading
       drivetrain
-          .Run([this] {
+          .Run([this]
+               {
             frc::Rotation2d fieldTarget{aim.robotHeading + 180_deg};
             frc::Rotation2d opPerspective =
                 drivetrain.GetOperatorForwardDirection();
             frc::Rotation2d adjTarget = fieldTarget.RotateBy(-opPerspective);
             drivetrain.SetControl(aimDrive.WithVelocityX(0_mps)
                                       .WithVelocityY(0_mps)
-                                      .WithTargetDirection(adjTarget));
-          })
+                                      .WithTargetDirection(adjTarget)); })
           // 2. Spin up flywheel + set hood from live distance
           .AlongWith(frc2::cmd::Run(
-              [this] { shooter.SetFromDistance(aim.distance.value()); },
+              [this]
+              { shooter.SetFromDistance(aim.distance.value()); },
               {&shooter}))
           // 3. Agitate: slowly raise the intake to help move stuck balls
-          .AlongWith(frc2::cmd::Run([this] { intake.SetDeployState(IntakeSubsystem::DeployState::kAgitating); intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking); }, {&intake}))
+          .AlongWith(frc2::cmd::Wait(2_s).AndThen(frc2::cmd::Run([this]
+                                    { intake.SetDeployState(IntakeSubsystem::DeployState::kAgitating); intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking); }, {&intake})))
           // 4. Feed only when aimed, at speed, and hood is ready
           .AlongWith(frc2::cmd::Run(
-              [this] {
+              [this]
+              {
                 bool aimed = aim.IsAimed();
                 bool atSpeed = shooter.IsStableAtSpeed();
                 bool hoodReady = shooter.IsHoodAtTarget();
                 frc::SmartDashboard::PutBoolean("Auto/Aimed", aimed);
                 frc::SmartDashboard::PutBoolean("Auto/AtSpeed", atSpeed);
                 frc::SmartDashboard::PutBoolean("Auto/HoodReady", hoodReady);
-                if (aimed && atSpeed && hoodReady) {
+                if (aimed && atSpeed && hoodReady)
+                {
                   feeder.SetState(FeederSubsystem::FeederState::kFeeding);
-                } else {
+                }
+                else
+                {
                   feeder.SetState(FeederSubsystem::FeederState::kIdle);
                 }
               },
               {&feeder}))
           .WithTimeout(4_s)
           .AndThen(frc2::cmd::RunOnce(
-              [this] {
+              [this]
+              {
                 shooter.SetRunning(false);
                 shooter.SetHoodAngle(ShooterConstants::kHoodMinDegrees);
                 feeder.SetState(FeederSubsystem::FeederState::kIdle);
@@ -94,12 +103,14 @@ RobotContainer::RobotContainer() {
   ConfigureBindings();
 }
 
-void RobotContainer::ConfigureBindings() {
+void RobotContainer::ConfigureBindings()
+{
   // Shift rumble: vibrate both controllers for kRumbleWarningSeconds before
   // each alliance hub shift. Runs as the default command during teleop and
   // automatically clears rumble when teleop ends.
   allianceShift.SetDefaultCommand(frc2::cmd::Run(
-      [this] {
+      [this]
+      {
         double rumble = allianceShift.IsShiftRumble() ? 1.0 : 0.0;
         joystick.GetHID().SetRumble(frc::GenericHID::RumbleType::kBothRumble,
                                     rumble);
@@ -108,69 +119,76 @@ void RobotContainer::ConfigureBindings() {
 
   // Clear rumble on any non-teleop mode (disabled, auto) so controllers
   // don't stay vibrating if teleop ends mid-rumble.
-  frc2::RobotModeTriggers::Teleop().OnFalse(frc2::cmd::RunOnce([this] {
-    joystick.GetHID().SetRumble(frc::GenericHID::RumbleType::kBothRumble, 0.0);
-  }));
+  frc2::RobotModeTriggers::Teleop().OnFalse(frc2::cmd::RunOnce([this]
+                                                               { joystick.GetHID().SetRumble(frc::GenericHID::RumbleType::kBothRumble, 0.0); }));
 
   // Reset shooter/feeder when teleop starts so auto-shoot state doesn't
   // carry over from autonomous.
   frc2::RobotModeTriggers::Teleop().OnTrue(frc2::cmd::RunOnce(
-      [this] {
-        shooter.SetRunning(false);
-        shooter.SetHoodAngle(ShooterConstants::kHoodMinDegrees);
-        feeder.SetState(FeederSubsystem::FeederState::kIdle);
-      },
-      {&shooter, &feeder}).AndThen(frc2::cmd::RunOnce([this] {
+                                               [this]
+                                               {
+                                                 shooter.SetRunning(false);
+                                                 shooter.SetHoodAngle(ShooterConstants::kHoodMinDegrees);
+                                                 feeder.SetState(FeederSubsystem::FeederState::kIdle);
+                                               },
+                                               {&shooter, &feeder})
+                                               .AndThen(frc2::cmd::RunOnce([this]
+                                                                           {
         intake.SetDeployState(IntakeSubsystem::DeployState::kDeployed);
-        intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking);
-      }, {&intake})));
+        intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking); }, {&intake})));
 
   // Feed the aim subsystem the current robot pose every loop
   aim.SetDefaultCommand(frc2::cmd::Run(
-      [this] { aim.UpdatePose(drivetrain.GetState().Pose); }, {&aim}));
+      [this]
+      { aim.UpdatePose(drivetrain.GetState().Pose); }, {&aim}));
 
   // Flywheel idles at low RPM by default — keeps it warm for fast spin-up.
   // Right trigger overrides with full shooting speed from interpolation map.
   shooter.SetDefaultCommand(
-      frc2::cmd::RunOnce([this] { shooter.SetRunning(false); }, {&shooter})
+      frc2::cmd::RunOnce([this]
+                         { shooter.SetRunning(false); }, {&shooter})
           .AndThen(frc2::cmd::Idle({&shooter})));
 
   // Note that X is defined as forward according to WPILib convention,
   // and Y is defined as to the left according to WPILib convention.
   drivetrain.SetDefaultCommand(
       // Drivetrain will execute this command periodically
-      drivetrain.ApplyRequest([this]() -> auto&& {
-        return drive
-            .WithVelocityX(-joystick.GetLeftY() *
-                           MaxSpeed)  // Drive forward with negative Y (forward)
-            .WithVelocityY(-joystick.GetLeftX() *
-                           MaxSpeed)  // Drive left with negative X (left)
-            .WithRotationalRate(-joystick.GetRightX() *
-                                MaxAngularRate);  // Drive counterclockwise with
-                                                  // negative X (left)
-      }));
+      drivetrain.ApplyRequest([this]() -> auto &&
+                              {
+                                return drive
+                                    .WithVelocityX(-joystick.GetLeftY() *
+                                                   MaxSpeed) // Drive forward with negative Y (forward)
+                                    .WithVelocityY(-joystick.GetLeftX() *
+                                                   MaxSpeed) // Drive left with negative X (left)
+                                    .WithRotationalRate(-joystick.GetRightX() *
+                                                        MaxAngularRate); // Drive counterclockwise with
+                                                                         // negative X (left)
+                              }));
 
   // Idle while the robot is disabled. This ensures the configured
   // neutral mode is applied to the drive motors while disabled.
   frc2::RobotModeTriggers::Disabled().WhileTrue(
-      drivetrain.ApplyRequest([] { return swerve::requests::Idle{}; })
+      drivetrain.ApplyRequest([]
+                              { return swerve::requests::Idle{}; })
           .IgnoringDisable(true));
 
   // A button: manual feed override — forces feeder on regardless of flywheel
   // speed. Works even while right trigger is held (the RT feeder lambda checks
   // m_manualFeedOverride). Also works standalone when RT is not held.
   joystick.A()
-      .WhileTrue(frc2::cmd::RunOnce([this] {
+      .WhileTrue(frc2::cmd::RunOnce([this]
+                                    {
                    m_manualFeedOverride = true;
-                   feeder.SetState(FeederSubsystem::FeederState::kFeeding);
-                 }).AndThen(frc2::cmd::Idle()))
-      .OnFalse(frc2::cmd::RunOnce([this] {
+                   feeder.SetState(FeederSubsystem::FeederState::kFeeding); })
+                     .AndThen(frc2::cmd::Idle()))
+      .OnFalse(frc2::cmd::RunOnce([this]
+                                  {
         m_manualFeedOverride = false;
-        feeder.SetState(FeederSubsystem::FeederState::kIdle);
-      }));
-      // Gyro resets after the Start and Back Button on the controllers are pressed simultaneously. This is useful for field-centric driving.
-    (joystick.Start() && joystick.Back())
-      .OnTrue(drivetrain.RunOnce([this] { drivetrain.SeedFieldCentric(); }));
+        feeder.SetState(FeederSubsystem::FeederState::kIdle); }));
+  // Gyro resets after the Start and Back Button on the controllers are pressed simultaneously. This is useful for field-centric driving.
+  (joystick.Start() && joystick.Back())
+      .OnTrue(drivetrain.RunOnce([this]
+                                 { drivetrain.SeedFieldCentric(); }));
 
   // Right trigger held: turn to face hub (back of robot). Drive freely while
   // rotating; brake when sticks idle and aimed. After a 1 second delay, also
@@ -182,7 +200,8 @@ void RobotContainer::ConfigureBindings() {
   joystick.RightTrigger(0.3)
       .WhileTrue(
           drivetrain
-              .Run([this] {
+              .Run([this]
+                   {
                 double lx = -joystick.GetLeftX();
                 double ly = -joystick.GetLeftY();
 
@@ -194,35 +213,46 @@ void RobotContainer::ConfigureBindings() {
 
                 drivetrain.SetControl(aimDrive.WithVelocityX(ly * MaxSpeed)
                                           .WithVelocityY(lx * MaxSpeed)
-                                          .WithTargetDirection(adjTarget));
-              })
+                                          .WithTargetDirection(adjTarget)); })
               .AlongWith(frc2::cmd::Run(
-                  [this] {
+                  [this]
+                  {
                     // Use interpolation map for hub shots, hardcoded for passes
-                    if (aim.IsPassingMode()) {
+                    if (aim.IsPassingMode())
+                    {
                       shooter.SetHoodAngle(45.0);
                       shooter.SetFlywheelRPM(2500.0);
-                    } else {
+                    }
+                    else
+                    {
                       shooter.SetFromDistance(aim.distance.value());
                     }
                   },
                   {&shooter}))
-              .AlongWith(frc2::cmd::Wait(1_s).AndThen(frc2::cmd::Run(
-                  [this] {
-                    // Only agitate when shooting at the hub, not when passing
-                    if (!aim.IsPassingMode()) {
-                      // Slowly raise the intake, then hold at the top
-                      intake.SetDeployState(IntakeSubsystem::DeployState::kAgitating);
-                      intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking);
-                    } else {
-                      // Passing — hold deployed angle, no agitation
-                      intake.SetDeployState(IntakeSubsystem::DeployState::kDeployed);
-                      intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking);
-                    }
-                  },
-                  {&intake})))
+              // .AlongWith(frc2::cmd::Wait(2_s).AndThen(frc2::cmd::Run(
+              //     [this]
+              //     {
+              //       bool aimed = aim.IsAimed();
+              //       bool atSpeed = shooter.IsStableAtSpeed();
+              //       bool hoodReady = shooter.IsHoodAtTarget();
+              //       // Only agitate when shooting at the hub, not when passing
+              //       if (!aim.IsPassingMode() && (aimed && atSpeed && hoodReady))
+              //       {
+              //         // Slowly raise the intake, then hold at the top
+              //         intake.SetDeployState(IntakeSubsystem::DeployState::kAgitating);
+              //         intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking);
+              //       }
+              //       else
+              //       {
+              //         // Passing — hold deployed angle, no agitation
+              //         intake.SetDeployState(IntakeSubsystem::DeployState::kDeployed);
+              //         intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking);
+              //       }
+              //     },
+              //     {&intake})))
               .AlongWith(frc2::cmd::Run(
-                  [this] {
+                  [this]
+                  {
                     // All three conditions must be met before feeding:
                     //   1. Robot is aimed at target (within heading tolerance)
                     //   2. Flywheel is stable at the correct speed
@@ -241,51 +271,57 @@ void RobotContainer::ConfigureBindings() {
                     frc::SmartDashboard::PutBoolean(
                         "Feed/ReadyToFire",
                         manualOverride || (aimed && atSpeed && hoodReady));
-                    if (manualOverride || (aimed && atSpeed && hoodReady)) {
+                    if (manualOverride || (aimed && atSpeed && hoodReady))
+                    {
                       feeder.SetState(FeederSubsystem::FeederState::kFeeding);
-                    } else {
+                    }
+                    else
+                    {
                       feeder.SetState(FeederSubsystem::FeederState::kIdle);
                     }
                   },
                   {&feeder})))
       .OnFalse(frc2::cmd::RunOnce(
-          [this] {
-            shooter.SetRunning(false);
-            shooter.SetHoodAngle(ShooterConstants::kHoodMinDegrees);
-            feeder.SetState(FeederSubsystem::FeederState::kIdle);
-            m_manualFeedOverride = false;
-            // Resume intaking — rollers back on (deploy chain broken, stays
-            // down)
-            
-          },
-          {&shooter, &intake, &feeder}).AndThen(frc2::cmd::RunOnce([this] {
+                   [this]
+                   {
+                     shooter.SetRunning(false);
+                     shooter.SetHoodAngle(ShooterConstants::kHoodMinDegrees);
+                     feeder.SetState(FeederSubsystem::FeederState::kIdle);
+                     m_manualFeedOverride = false;
+                     // Resume intaking — rollers back on (deploy chain broken, stays
+                     // down)
+                   },
+                   {&shooter, &intake, &feeder})
+                   .AndThen(frc2::cmd::RunOnce([this]
+                                               {
             intake.SetDeployState(IntakeSubsystem::DeployState::kDeployed);
-            intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking);
-          }, {&intake})));
+            intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking); }, {&intake})));
 
   // Left trigger: enable intake rollers and deploy intake
   joystick.LeftTrigger(0.3).OnTrue(
-      frc2::cmd::RunOnce([this] {
+      frc2::cmd::RunOnce([this]
+                         {
         intake.SetDeployState(IntakeSubsystem::DeployState::kDeployed);
-        intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking);
-      }, {&intake}));
+        intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking); }, {&intake}));
 
   // Left bumper: stop rollers and stow intake
   joystick.LeftBumper().OnTrue(
-      frc2::cmd::RunOnce([this] {
+      frc2::cmd::RunOnce([this]
+                         {
         intake.SetDeployState(IntakeSubsystem::DeployState::kStowed);
-        intake.SetRollerState(IntakeSubsystem::RollerState::kIdle);
-      }, {&intake}));
+        intake.SetRollerState(IntakeSubsystem::RollerState::kIdle); }, {&intake}));
 
-    joystick.X().OnTrue(
-      frc2::cmd::RunOnce([this] {
+  joystick.X().OnTrue(
+                  frc2::cmd::RunOnce([this]
+                                     {
      intake.SetDeployState(IntakeSubsystem::DeployState::kAgitating);        
-     intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking);
-      }, {&intake})).OnFalse(
-      frc2::cmd::RunOnce([this] {
+     intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking); }, {&intake}))
+      .OnFalse(
+          frc2::cmd::RunOnce([this]
+                             {
      intake.SetDeployState(IntakeSubsystem::DeployState::kDeployed);        
-      intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking);
-      }, {&intake}));
+      intake.SetRollerState(IntakeSubsystem::RollerState::kIntaking); }, {&intake}));
+  
   // Run SysId routines when holding back/start and X/Y.
   // Note that each routine should be run exactly once in a single log.
   // (joystick.Back() && joystick.Y())
@@ -298,9 +334,11 @@ void RobotContainer::ConfigureBindings() {
   //     .WhileTrue(drivetrain.SysIdQuasistatic(frc2::sysid::Direction::kReverse));
 
   drivetrain.RegisterTelemetry(
-      [this](auto const& state) { logger.Telemeterize(state); });
+      [this](auto const &state)
+      { logger.Telemeterize(state); });
 }
- 
-frc2::Command* RobotContainer::GetAutonomousCommand() {
+
+frc2::Command *RobotContainer::GetAutonomousCommand()
+{
   return m_autoChooser.GetSelected();
 }

@@ -66,7 +66,7 @@ void ShooterSubsystem::ConfigureMotors() {
   // directly.
   rev::spark::SparkFlexConfig hoodCfg{};
   hoodCfg.SetIdleMode(rev::spark::SparkBaseConfig::IdleMode::kBrake);
-  hoodCfg.SmartCurrentLimit(40);
+  hoodCfg.SmartCurrentLimit(40.0, 20.0);
   hoodCfg.Inverted(false);
   hoodCfg.VoltageCompensation(12.0);
 
