@@ -13,7 +13,8 @@
 // Construction
 // ─────────────────────────────────────────────────────────────────────────────
 
-IntakeSubsystem::IntakeSubsystem() {
+IntakeSubsystem::IntakeSubsystem()
+{
   ConfigureMotors();
   // Robot always starts deployed (down, 0 deg) — zero the encoder to match
   m_deployEncoder.SetPosition(IntakeConstants::kDeployedAngleDeg);
@@ -23,11 +24,12 @@ IntakeSubsystem::IntakeSubsystem() {
 // Motor configuration
 // ─────────────────────────────────────────────────────────────────────────────
 
-void IntakeSubsystem::ConfigureMotors() {
+void IntakeSubsystem::ConfigureMotors()
+{
   // ── Deploy ────────────────────────────────────────────────────────────────
   rev::spark::SparkFlexConfig deployConfig{};
 
-  deployConfig.SmartCurrentLimit(40, 20);
+  deployConfig.SmartCurrentLimit(40.0, 20.0);
   deployConfig.SetIdleMode(rev::spark::SparkBaseConfig::IdleMode::kBrake);
   deployConfig.Inverted(false);
   deployConfig.VoltageCompensation(12.0);
@@ -44,16 +46,16 @@ void IntakeSubsystem::ConfigureMotors() {
       .ReverseSoftLimitEnabled(true);
 
   // Configure Slot 0
-deployConfig.closedLoop
-    .SetFeedbackSensor(rev::spark::kPrimaryEncoder)
-    .Pid(IntakeConstants::kDeployP, IntakeConstants::kDeployI,
-         IntakeConstants::kDeployD, rev::spark::ClosedLoopSlot::kSlot0) 
-    .OutputRange(-0.8, 0.8, rev::spark::ClosedLoopSlot::kSlot0);
+  deployConfig.closedLoop
+      .SetFeedbackSensor(rev::spark::kPrimaryEncoder)
+      .Pid(IntakeConstants::kDeployP, IntakeConstants::kDeployI,
+           IntakeConstants::kDeployD, rev::spark::ClosedLoopSlot::kSlot0)
+      .OutputRange(-0.8, 0.8, rev::spark::ClosedLoopSlot::kSlot0);
 
   // Configure Slot 1
   deployConfig.closedLoop
       .Pid(IntakeConstants::kDeployP, IntakeConstants::kDeployI,
-           IntakeConstants::kDeployD, rev::spark::ClosedLoopSlot::kSlot1) 
+           IntakeConstants::kDeployD, rev::spark::ClosedLoopSlot::kSlot1)
       .OutputRange(-0.2, 0.2, rev::spark::ClosedLoopSlot::kSlot1);
 
   m_deployMotor.Configure(deployConfig, rev::ResetMode::kResetSafeParameters,
@@ -61,8 +63,9 @@ deployConfig.closedLoop
 
   // ── Rollers ───────────────────────────────────────────────────────────────
   rev::spark::SparkFlexConfig rollerConfig{};
+  rev::spark::SparkFlexConfig followerConfig{};
 
-  rollerConfig.SmartCurrentLimit(60);
+  rollerConfig.SmartCurrentLimit(40.0, 20.0);
   rollerConfig.SetIdleMode(rev::spark::SparkBaseConfig::IdleMode::kCoast);
   rollerConfig.VoltageCompensation(12.0);
 
@@ -74,61 +77,73 @@ deployConfig.closedLoop
 
   m_rollerMotor.Configure(rollerConfig, rev::ResetMode::kResetSafeParameters,
                           rev::PersistMode::kPersistParameters);
+
+  followerConfig.Apply(rollerConfig);
+
+  followerConfig.Follow(m_rollerMotor.GetDeviceId(), true);
+
+  m_followerMotor.Configure(followerConfig, rev::ResetMode::kResetSafeParameters,
+                            rev::PersistMode::kPersistParameters);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // State setters
 // ─────────────────────────────────────────────────────────────────────────────
 
-void IntakeSubsystem::SetDeployState(DeployState state) {
+void IntakeSubsystem::SetDeployState(DeployState state)
+{
   m_deployState = state;
-  switch (m_deployState) {
-    case DeployState::kDeployed:
-      m_deployController.SetSetpoint(
-          IntakeConstants::kDeployedAngleDeg,
-          rev::spark::SparkLowLevel::ControlType::kPosition, 
-          rev::spark::ClosedLoopSlot::kSlot0);
-      break;
-    case DeployState::kAgitating:
-      m_deployController.SetSetpoint(
-          IntakeConstants::kStowedAngleDeg,
-          rev::spark::SparkLowLevel::ControlType::kPosition, 
-          rev::spark::ClosedLoopSlot::kSlot1); // Slot 1 contains your capped [-0.2, 0.2] range
-      break;
-    case DeployState::kStowed:
-      m_deployController.SetSetpoint(
-          IntakeConstants::kStowedAngleDeg,
-          rev::spark::SparkLowLevel::ControlType::kPosition, 
-          rev::spark::ClosedLoopSlot::kSlot0);
-      break;
+  switch (m_deployState)
+  {
+  case DeployState::kDeployed:
+    m_deployController.SetSetpoint(
+        IntakeConstants::kDeployedAngleDeg,
+        rev::spark::SparkLowLevel::ControlType::kPosition,
+        rev::spark::ClosedLoopSlot::kSlot0);
+    break;
+  case DeployState::kAgitating:
+    m_deployController.SetSetpoint(
+        IntakeConstants::kStowedAngleDeg,
+        rev::spark::SparkLowLevel::ControlType::kPosition,
+        rev::spark::ClosedLoopSlot::kSlot1); // Slot 1 contains your capped [-0.2, 0.2] range
+    break;
+  case DeployState::kStowed:
+    m_deployController.SetSetpoint(
+        IntakeConstants::kStowedAngleDeg,
+        rev::spark::SparkLowLevel::ControlType::kPosition,
+        rev::spark::ClosedLoopSlot::kSlot0);
+    break;
   }
 }
 
-void IntakeSubsystem::SetRollerState(RollerState state) {
-  if (state == RollerState::kUnjamming) return;  // auto-managed only
+void IntakeSubsystem::SetRollerState(RollerState state)
+{
+  if (state == RollerState::kUnjamming)
+    return; // auto-managed only
   m_rollerState = state;
 
-  switch (m_rollerState) {
-    case RollerState::kIntaking:
-      m_rollerController.SetSetpoint(
-          IntakeConstants::kRollerIntakeRPM,
-          rev::spark::SparkLowLevel::ControlType::kVelocity);
-      break;
-    case RollerState::kOuttaking:
-      // Deploy stays wherever it is — just reverse the roller
-      m_rollerController.SetSetpoint(
-          IntakeConstants::kRollerOuttakeRPM,
-          rev::spark::SparkLowLevel::ControlType::kVelocity);
-      break;
-    case RollerState::kEjecting:
-      m_rollerController.SetSetpoint(
-          IntakeConstants::kRollerEjectRPM,
-          rev::spark::SparkLowLevel::ControlType::kVelocity);
-      break;
-    case RollerState::kIdle:
-    default:
-      m_rollerMotor.StopMotor();
-      break;
+  switch (m_rollerState)
+  {
+  case RollerState::kIntaking:
+    m_rollerController.SetSetpoint(
+        IntakeConstants::kRollerIntakeRPM,
+        rev::spark::SparkLowLevel::ControlType::kVelocity);
+    break;
+  case RollerState::kOuttaking:
+    // Deploy stays wherever it is — just reverse the roller
+    m_rollerController.SetSetpoint(
+        IntakeConstants::kRollerOuttakeRPM,
+        rev::spark::SparkLowLevel::ControlType::kVelocity);
+    break;
+  case RollerState::kEjecting:
+    m_rollerController.SetSetpoint(
+        IntakeConstants::kRollerEjectRPM,
+        rev::spark::SparkLowLevel::ControlType::kVelocity);
+    break;
+  case RollerState::kIdle:
+  default:
+    m_rollerMotor.StopMotor();
+    break;
   }
 }
 
@@ -137,11 +152,13 @@ void IntakeSubsystem::SetRollerState(RollerState state) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Encoder natively reports degrees thanks to PositionConversionFactor
-double IntakeSubsystem::GetAngleDeg() const {
+double IntakeSubsystem::GetAngleDeg() const
+{
   return m_deployEncoder.GetPosition();
 }
 
-bool IntakeSubsystem::IsDeployAtTarget() const {
+bool IntakeSubsystem::IsDeployAtTarget() const
+{
   return std::abs(GetAngleDeg() - m_targetAngleDeg) <=
          IntakeConstants::kDeployToleranceDeg;
 }
@@ -150,7 +167,8 @@ bool IntakeSubsystem::IsDeployAtTarget() const {
 // Jam detection — current spike AND velocity stall must both be true
 // ─────────────────────────────────────────────────────────────────────────────
 
-bool IntakeSubsystem::IsJammed() {
+bool IntakeSubsystem::IsJammed()
+{
   return m_rollerMotor.GetOutputCurrent() >
              IntakeConstants::kJamCurrentThreshold &&
          std::abs(m_rollerMotor.GetEncoder().GetVelocity()) <
@@ -161,7 +179,8 @@ bool IntakeSubsystem::IsJammed() {
 // Brake / coast mode for field setup
 // ─────────────────────────────────────────────────────────────────────────────
 
-void IntakeSubsystem::SetDeployBrakeMode(bool brake) {
+void IntakeSubsystem::SetDeployBrakeMode(bool brake)
+{
   rev::spark::SparkFlexConfig cfg{};
   cfg.SetIdleMode(brake ? rev::spark::SparkBaseConfig::IdleMode::kBrake
                         : rev::spark::SparkBaseConfig::IdleMode::kCoast);
@@ -173,16 +192,21 @@ void IntakeSubsystem::SetDeployBrakeMode(bool brake) {
 // Periodic — only handles automatic unjam logic and telemetry
 // ─────────────────────────────────────────────────────────────────────────────
 
-void IntakeSubsystem::Periodic() {
+void IntakeSubsystem::Periodic()
+{
   // ── Sustained jam detection ───────────────────────────────────────────────
-  if (m_rollerState == RollerState::kIntaking) {
-    if (IsJammed()) {
-      if (!m_isJamming) {
+  if (m_rollerState == RollerState::kIntaking)
+  {
+    if (IsJammed())
+    {
+      if (!m_isJamming)
+      {
         m_jamTimer.Restart();
         m_isJamming = true;
       }
       if (m_jamTimer.HasElapsed(
-              units::second_t{IntakeConstants::kJamConfirmSec})) {
+              units::second_t{IntakeConstants::kJamConfirmSec}))
+      {
         m_isJamming = false;
         m_rollerState = RollerState::kUnjamming;
         m_unjamTimer.Restart();
@@ -190,13 +214,17 @@ void IntakeSubsystem::Periodic() {
             IntakeConstants::kRollerEjectRPM,
             rev::spark::SparkLowLevel::ControlType::kVelocity);
       }
-    } else {
+    }
+    else
+    {
       m_isJamming = false;
       m_jamTimer.Stop();
     }
-  } else if (m_rollerState == RollerState::kUnjamming &&
-             m_unjamTimer.HasElapsed(
-                 units::second_t{IntakeConstants::kUnjamDurationSec})) {
+  }
+  else if (m_rollerState == RollerState::kUnjamming &&
+           m_unjamTimer.HasElapsed(
+               units::second_t{IntakeConstants::kUnjamDurationSec}))
+  {
     m_rollerState = RollerState::kIntaking;
     m_rollerController.SetSetpoint(
         IntakeConstants::kRollerIntakeRPM,
@@ -218,7 +246,7 @@ void IntakeSubsystem::Periodic() {
       m_deployState == DeployState::kStowed ? "Stowed" : "Deployed");
   frc::SmartDashboard::PutString(
       "Intake/RollerState",
-      m_rollerState == RollerState::kIdle        ? "Idle" 
+      m_rollerState == RollerState::kIdle        ? "Idle"
       : m_rollerState == RollerState::kIntaking  ? "Intaking"
       : m_rollerState == RollerState::kOuttaking ? "Outtaking"
       : m_rollerState == RollerState::kEjecting  ? "Ejecting"

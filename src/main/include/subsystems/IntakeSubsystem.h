@@ -63,6 +63,8 @@ class IntakeSubsystem : public frc2::SubsystemBase {
       IntakeConstants::kDeployID, rev::spark::SparkFlex::MotorType::kBrushless};
   rev::spark::SparkFlex m_rollerMotor{
       IntakeConstants::kRollerID, rev::spark::SparkFlex::MotorType::kBrushless};
+  rev::spark::SparkFlex m_followerMotor{
+      IntakeConstants::kFollowerID, rev::spark::SparkFlex::MotorType::kBrushless};
 
   // ── Controllers / encoders ────────────────────────────────────────────────
   rev::spark::SparkClosedLoopController m_deployController =
@@ -71,6 +73,9 @@ class IntakeSubsystem : public frc2::SubsystemBase {
 
   rev::spark::SparkClosedLoopController m_rollerController =
       m_rollerMotor.GetClosedLoopController();
+
+  rev::spark::SparkClosedLoopController m_followerController =
+      m_followerMotor.GetClosedLoopController();
 
   // ── State ─────────────────────────────────────────────────────────────────
   DeployState m_deployState = DeployState::kDeployed;
